@@ -16,7 +16,7 @@ const (
 	endpoint = "https://data.charm.land"
 	key      = "***REMOVED***"
 
-	nonInteractiveEvenName = "NonInteractive"
+	nonInteractiveEventName = "NonInteractive"
 )
 
 var (
@@ -29,11 +29,11 @@ var (
 			Set("SHELL", filepath.Base(os.Getenv("SHELL"))).
 			Set("Version", version.Version).
 			Set("GoVersion", runtime.Version()).
-			Set(nonInteractiveEvenName, false)
+			Set(nonInteractiveEventName, false)
 )
 
 func SetNonInteractive(nonInteractive bool) {
-	baseProps = baseProps.Set(nonInteractiveEvenName, nonInteractive)
+	baseProps = baseProps.Set(nonInteractiveEventName, nonInteractive)
 }
 
 func Init() {
