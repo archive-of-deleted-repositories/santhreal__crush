@@ -62,8 +62,6 @@ func ResetCache() {
 var (
 	searchRegexCache = newRegexCache()
 	globRegexCache   = newRegexCache()
-	// Pre-compiled regex for glob conversion (used frequently)
-	globBraceRegex = regexp.MustCompile(`\{([^}]+)\}`)
 )
 
 type GrepParams struct {
@@ -422,15 +420,47 @@ func isTextFile(filePath string) bool {
 }
 
 func globToRegex(glob string) string {
-	regexPattern := strings.ReplaceAll(glob, ".", "\\.")
-	regexPattern = strings.ReplaceAll(regexPattern, "*", ".*")
-	regexPattern = strings.ReplaceAll(regexPattern, "?", ".")
+	var b strings.Builder
+	i := 0
+	for i < len(glob) {
+		if glob[i] == '{' {
+			if end := strings.IndexByte(glob[i:], '}'); end >= 0 {
+				b.WriteByte('(')
+				for j, part := range strings.Split(glob[i+1:i+end], ",") {
+					if j > 0 {
+						b.WriteByte('|')
+					}
+					b.WriteString(globCharsToRegex(part))
+				}
+				b.WriteByte(')')
+				i += end + 1
+				continue
+			}
+		}
+		b.WriteString(globByteToRegex(glob[i]))
+		i++
+	}
+	return b.String()
+}
 
-	// Use pre-compiled regex instead of compiling each time
-	regexPattern = globBraceRegex.ReplaceAllStringFunc(regexPattern, func(match string) string {
-		inner := match[1 : len(match)-1]
-		return "(" + strings.ReplaceAll(inner, ",", "|") + ")"
-	})
+// globCharsToRegex translates the glob wildcards `*` and `?` while escaping
+// every regex metacharacter, so literal characters like `(` or `[` in a glob
+// match themselves instead of being interpreted as regex syntax.
+func globCharsToRegex(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		b.WriteString(globByteToRegex(s[i]))
+	}
+	return b.String()
+}
 
-	return regexPattern
+func globByteToRegex(c byte) string {
+	switch c {
+	case '*':
+		return ".*"
+	case '?':
+		return "."
+	default:
+		return regexp.QuoteMeta(string(c))
+	}
 }

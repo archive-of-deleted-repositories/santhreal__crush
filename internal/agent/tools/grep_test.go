@@ -56,6 +56,34 @@ func TestGlobToRegexCaching(t *testing.T) {
 	}
 }
 
+func TestGlobToRegexEscapesMetacharacters(t *testing.T) {
+	cases := []struct {
+		glob      string
+		matches   []string
+		noMatches []string
+	}{
+		// Regex metacharacters in a glob must be treated as literals.
+		{glob: "file(1).go", matches: []string{"file(1).go"}, noMatches: []string{"file1.go"}},
+		{glob: "cost+util.go", matches: []string{"cost+util.go"}, noMatches: []string{"costtutil.go", "cosutil.go"}},
+		{glob: "a[b.go", matches: []string{"a[b.go"}, noMatches: []string{"ab.go"}},
+		{glob: "price$.txt", matches: []string{"price$.txt"}, noMatches: []string{"price.txt"}},
+		// Glob wildcards and brace alternation must still work.
+		{glob: "*.{js,ts}", matches: []string{"app.js", "app.ts"}, noMatches: []string{"app.go"}},
+		{glob: "v?.go", matches: []string{"v1.go"}, noMatches: []string{"v.go", "v12.go"}},
+	}
+	for _, tc := range cases {
+		pattern := globToRegex(tc.glob)
+		re, err := regexp.Compile(pattern)
+		require.NoErrorf(t, err, "glob %q produced invalid regex %q", tc.glob, pattern)
+		for _, m := range tc.matches {
+			require.Truef(t, re.MatchString(m), "glob %q (regex %q) should match %q", tc.glob, pattern, m)
+		}
+		for _, nm := range tc.noMatches {
+			require.Falsef(t, re.MatchString(nm), "glob %q (regex %q) should not match %q", tc.glob, pattern, nm)
+		}
+	}
+}
+
 func TestGrepWithIgnoreFiles(t *testing.T) {
 	t.Parallel()
 	tempDir := t.TempDir()
