@@ -2291,3 +2291,40 @@ func TestConfig_configureProviders_UnsetAzureEndpointSkipsProvider(t *testing.T)
 	_, exists := cfg.Providers.Get("azure")
 	require.False(t, exists)
 }
+
+func TestPushPopCrushEnvRestoresUnsetVar(t *testing.T) {
+	const target = "CRUSH_UNSET_TARGET_TEST"
+	const plain = "UNSET_TARGET_TEST"
+	// The plain variable must start genuinely unset.
+	if err := os.Unsetenv(plain); err != nil {
+		t.Fatalf("Unsetenv: %v", err)
+	}
+	t.Setenv(target, "from-crush")
+
+	restore := PushPopCrushEnv()
+	if got := os.Getenv(plain); got != "from-crush" {
+		t.Fatalf("expected %s promoted to %q, got %q", plain, "from-crush", got)
+	}
+	restore()
+
+	if v, ok := os.LookupEnv(plain); ok {
+		t.Fatalf("expected %s unset after restore, got %q", plain, v)
+	}
+}
+
+func TestPushPopCrushEnvRestoresSetVar(t *testing.T) {
+	const target = "CRUSH_SET_TARGET_TEST"
+	const plain = "SET_TARGET_TEST"
+	t.Setenv(plain, "original")
+	t.Setenv(target, "from-crush")
+
+	restore := PushPopCrushEnv()
+	if got := os.Getenv(plain); got != "from-crush" {
+		t.Fatalf("expected %s promoted to %q, got %q", plain, "from-crush", got)
+	}
+	restore()
+
+	if got, ok := os.LookupEnv(plain); !ok || got != "original" {
+		t.Fatalf("expected %s restored to %q, got %q (set=%v)", plain, "original", got, ok)
+	}
+}

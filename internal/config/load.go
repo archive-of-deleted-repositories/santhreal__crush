@@ -177,8 +177,13 @@ func PushPopCrushEnv() func() {
 		}
 	}
 	backups := make(map[string]string)
+	existed := make(map[string]bool)
 	for _, ev := range found {
-		backups[ev] = os.Getenv(ev)
+		// Track whether the variable was actually set: os.Getenv cannot
+		// distinguish an empty value from an unset one, and restoring an
+		// originally-unset variable to "" is not the same as leaving it
+		// unset (some SDKs treat "" as an explicit, invalid value).
+		backups[ev], existed[ev] = os.LookupEnv(ev)
 	}
 
 	for _, ev := range found {
@@ -187,7 +192,11 @@ func PushPopCrushEnv() func() {
 
 	restore := func() {
 		for k, v := range backups {
-			os.Setenv(k, v)
+			if existed[k] {
+				os.Setenv(k, v)
+			} else {
+				os.Unsetenv(k)
+			}
 		}
 	}
 	return restore
